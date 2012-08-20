@@ -342,6 +342,10 @@ then
 	iptables -A INPUT -p tcp -s $ZABBIX_IP --dport 10050 -j ACCEPT # Zabbix -> SELF
 fi
 
+echo "chains they will be enabled by pressing the Ctrl-C within 30 seconds...\n"
+
 sleep 30
+
+echo "unset whole chains.\n"
 
 initialize
