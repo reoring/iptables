@@ -138,8 +138,8 @@ iptables -A OUTPUT -p tcp -m state --state ESTABLISHED,RELATED -j ACCEPT
 # 攻撃対策: Stealth Scan
 ###########################################################
 # すべてのTCPセッションがSYNで始まらないものを破棄
-#iptables -A INPUT -p tcp ! --syn -m state --state NEW -j LOG --log-prefix "[stealth scan attack] "
-#iptables -A INPUT -p tcp ! --syn -m state --state NEW -j DROP
+iptables -A INPUT -p tcp ! --syn -m state --state NEW -j LOG --log-prefix "[stealth scan attack] "
+iptables -A INPUT -p tcp ! --syn -m state --state NEW -j DROP
  
 ###########################################################
 # 攻撃対策: Ping of Death
