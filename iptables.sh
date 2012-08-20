@@ -8,18 +8,6 @@
 # 心配な場合は、送信も受信同様に基本破棄・ホワイトリストで許可するように書き換えると良い。
 ###########################################################
 
-# /**
-#  * iptablesの初期化
-#  * すべてのルールを削除
-#  */
-initialize()
-{
-	iptables -F # テーブル初期化
-	iptables -X # チェーンを削除
-	iptables -Z # パケットカウンタ・バイトカウンタをクリア
-}
-
-
 ###########################################################
 # 用語の統一
 # わかりやすさのためルールとコメントの用語を以下に統一する
@@ -27,6 +15,29 @@ initialize()
 # DROP   : 破棄
 # REJECT : 拒否
 ###########################################################
+
+###########################################################
+# チートシート
+#
+# -A, --append       指定チェインに1つ以上の新しいルールを追加
+# -D, --delete       指定チェインから1つ以上のルールを削除
+# -P, --policy       指定チェインのポリシーを指定したターゲットに設定
+# -N, --new-chain    新しいユーザー定義チェインを作成
+# -X, --delete-chain 指定ユーザー定義チェインを削除
+# -F                 テーブル初期化
+#
+# -p, --protocol      プロコトル         プロトコル(tcp、udp、icmp、all)を指定
+# -s, --source        IPアドレス[/mask]  送信元のアドレス。IPアドレスorホスト名を記述
+# -d, --destination   IPアドレス[/mask]  送信先のアドレス。IPアドレスorホスト名を記述
+# -i, --in-interface  デバイス           パケットが入ってくるインターフェイスを指定
+# -o, --out-interface デバイス           パケットが出ていくインターフェイスを指定
+# -j, --jump          ターゲット         条件に合ったときのアクションを指定
+# -t, --table         テーブル           テーブルを指定
+# -m state --state    状態              パケットの状態を条件として指定
+#                                       stateは、 NEW、ESTABLISHED、RELATED、INVALIDが指定できる
+# !                   条件を反転（～以外となる）
+###########################################################
+
 
 # パス
 PATH=/sbin:/usr/sbin:/bin:/usr/bin
@@ -81,14 +92,43 @@ MYSQL=3306
 NET_BIOS=135,137,138,139,445
 DHCP=67,68
 
+
+###########################################################
+# 関数
+###########################################################
+
+# iptablesの初期化, すべてのルールを削除
+initialize() 
+{
+	iptables -F # テーブル初期化
+	iptables -X # チェーンを削除
+	iptables -Z # パケットカウンタ・バイトカウンタをクリア
+	iptables -P INPUT   DROP
+	iptables -P OUTPUT  ACCEPT
+	iptables -P FORWARD DROP
+}
+
+# ルール適用後の処理
+finailize()
+{
+	/etc/init.d/iptables save && # 設定の保存
+	/etc/init.d/iptables restart && # 保存したもので再起動してみる
+	return 0
+	return 1
+}
+
+# 開発用
+if [ "$1" == "dev" ]
+then
+	iptables() { echo "iptables $@"; }
+	finailize() { echo "finailize"; }
+fi
+
+###########################################################
+# iptablesの初期化
+###########################################################
 initialize
 
-# ポリシーの初期化
-# 「ポリシーの決定」でDROPにおきかえる
-iptables -P INPUT   ACCEPT
-iptables -P OUTPUT  ACCEPT
-iptables -P FORWARD ACCEPT
- 
 
 ###########################################################
 # 信頼可能なホストは許可
@@ -145,6 +185,11 @@ iptables -A OUTPUT -p tcp -m state --state ESTABLISHED,RELATED -j ACCEPT
 # すべてのTCPセッションがSYNで始まらないものを破棄
 iptables -A INPUT -p tcp ! --syn -m state --state NEW -j LOG --log-prefix "[stealth scan attack] "
 iptables -A INPUT -p tcp ! --syn -m state --state NEW -j DROP
+
+
+# フラグメント化されたパケットはログを記録して破棄
+iptables -A INPUT -f -j LOG --log-prefix '[IPTABLES FRAGMENT] : '
+iptables -A INPUT -f -j DROP
  
 
 ###########################################################
@@ -250,6 +295,9 @@ iptables -A INPUT -p icmp -j ACCEPT # ANY -> SELF
 # HTTP, HTTPS
 iptables -A INPUT -p tcp -m multiport --dports $HTTP -j ACCEPT # ANY -> SELF
 
+# SSH
+iptables -A INPUT -m tcp -p tcp --dport $SSH -j ACCEPT
+
 # FTP
 # iptables -A INPUT -p tcp --dport $FTP -j ACCEPT # ANY -> SELF
 
@@ -294,30 +342,12 @@ then
 	iptables -A INPUT -p tcp -s $ZABBIX_IP --dport 10050 -j ACCEPT # Zabbix -> SELF
 fi
 
-
-###########################################################
-# ルール記述部
-###########################################################
-
-iptables -A INPUT -m tcp -p tcp --dport $SSH -j ACCEPT
-
-
-###########################################################
-# ポリシーの決定
-# すべてのパケットを破棄(DROP)する。
-# すべての穴をふさいでから必要なポートを空けていくのが良い。
-###########################################################
-iptables -P INPUT   DROP
-iptables -P OUTPUT  ACCEPT
-iptables -P FORWARD DROP
-
-
 ###########################################################
 # それ以外
 # 上記のルールにも当てはまらなかったものはロギングして破棄
 ###########################################################
-iptables -A INPUT  -j LOG --log-prefix "[drop] "
-iptables -A INPUT  -j DROP
+iptables -A INPUT -j LOG --log-prefix "[drop] "
+iptables -A INPUT -j DROP
  
 sleep 30
 
