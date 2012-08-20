@@ -62,6 +62,7 @@ PATH=/sbin:/usr/sbin:/bin:/usr/bin
 # 	"xxx.xxx.xxx.xxx"
 # )
 
+
 ###########################################################
 # ポート定義
 ###########################################################
@@ -88,6 +89,7 @@ iptables -P INPUT   ACCEPT
 iptables -P OUTPUT  ACCEPT
 iptables -P FORWARD ACCEPT
  
+
 ###########################################################
 # 信頼可能なホストは許可
 ###########################################################
@@ -116,6 +118,7 @@ then
 	done
 fi
 
+
 ###########################################################
 # 拒否IPからのアクセスは破棄
 ###########################################################
@@ -128,11 +131,13 @@ then
 	done
 fi
 
+
 ###########################################################
 # セッション確立後のパケット疎通は許可
 ###########################################################
 iptables -A INPUT  -p tcp -m state --state ESTABLISHED,RELATED -j ACCEPT
 iptables -A OUTPUT -p tcp -m state --state ESTABLISHED,RELATED -j ACCEPT
+
 
 ###########################################################
 # 攻撃対策: Stealth Scan
@@ -141,12 +146,14 @@ iptables -A OUTPUT -p tcp -m state --state ESTABLISHED,RELATED -j ACCEPT
 iptables -A INPUT -p tcp ! --syn -m state --state NEW -j LOG --log-prefix "[stealth scan attack] "
 iptables -A INPUT -p tcp ! --syn -m state --state NEW -j DROP
  
+
 ###########################################################
 # 攻撃対策: Ping of Death
 ###########################################################
 # 1秒間に10回を超えるpingを破棄
 iptables -A INPUT -p icmp --icmp-type echo-request -m limit --limit 1/s --limit-burst 10 -j LOG --log-prefix "[ping of death attack] "
 iptables -A INPUT -p icmp --icmp-type echo-request -m limit --limit 1/s --limit-burst 10 -j DROP
+
 
 ###########################################################
 # 攻撃対策: SYN Flood Attack
@@ -169,6 +176,7 @@ iptables -A SYN_FLOOD -j DROP
 # SYNパケットは "SYN_FLOOD" チェーンへジャンプ
 iptables -A INPUT -p tcp --syn -j SYN_FLOOD
 
+
 ###########################################################
 # 攻撃対策: HTTP DoS/DDoS Attack
 ###########################################################
@@ -182,14 +190,13 @@ iptables -A HTTP_DOS -m multiport -p tcp --dports $HTTP \
          --hashlimit-name t_HTTP_DOS \
          -j RETURN
 
-		 
-
 # 制限を超えた接続を破棄
 iptables -A HTTP_DOS -j LOG --log-prefix "[HTTP DoS attack] "
 iptables -A HTTP_DOS -j DROP
 
 # HTTPへのパケットは "HTTP_DOS" チェーンへジャンプ
 iptables -A INPUT -p tcp -m multiport --dports $HTTP -j HTTP_DOS
+
 
 ###########################################################
 # 攻撃対策: IDENT port probe
@@ -199,6 +206,7 @@ iptables -A INPUT -p tcp -m multiport --dports $HTTP -j HTTP_DOS
 # DROP ではメールサーバ等のレスポンス低下になるため REJECTする
 ###########################################################
 iptables -A INPUT -p tcp --dport $IDENT -j REJECT --reject-with tcp-reset
+
 
 ###########################################################
 # 攻撃対策: SSH Brute Force
@@ -211,6 +219,7 @@ iptables -A INPUT -p tcp --dport $IDENT -j REJECT --reject-with tcp-reset
 # iptables -A INPUT -p tcp --syn --dport $SSH -m recent --name ssh_attack --rcheck --seconds 60 --hitcount 5 -j LOG --log-prefix "[SSH Brute Force] "
 # iptables -A INPUT -p tcp --syn --dport $SSH -m recent --name ssh_attack --rcheck --seconds 60 --hitcount 5 -j REJECT --reject-with tcp-reset
 
+
 ###########################################################
 # 攻撃対策: FTP Brute Force
 # FTPはパスワード認証のため、パスワード総当り攻撃に備える。
@@ -222,12 +231,14 @@ iptables -A INPUT -p tcp --dport $IDENT -j REJECT --reject-with tcp-reset
 # iptables -A INPUT -p tcp --syn --dport $FTP -m recent --name ftp_attack --rcheck --seconds 60 --hitcount 5 -j LOG --log-prefix "[FTP Brute Force] "
 # iptables -A INPUT -p tcp --syn --dport $FTP -m recent --name ftp_attack --rcheck --seconds 60 --hitcount 5 -j REJECT --reject-with tcp-reset
 
+
 ###########################################################
 # 全ホスト(ブロードキャストアドレス、マルチキャストアドレス)宛パケットは破棄
 ###########################################################
 iptables -A INPUT -d 192.168.1.255   -j DROP
 iptables -A INPUT -d 255.255.255.255 -j DROP
 iptables -A INPUT -d 224.0.0.1 -j DROP
+
 
 ###########################################################
 # 全ホスト(ANY)からの入力許可
@@ -255,6 +266,7 @@ iptables -A INPUT -p tcp -m multiport --dports $HTTP -j ACCEPT # ANY -> SELF
 # IMAP
 # iptables -A INPUT -p tcp --sport $IMAP -j ACCEPT # ANY -> SELF
 
+
 ###########################################################
 # ローカルネットワークからの入力許可
 ###########################################################
@@ -271,6 +283,7 @@ then
 	iptables -A INPUT -p tcp -s $LOCAL_NET --dport $MYSQL -j ACCEPT # LOCALNET -> SELF
 fi
 
+
 ###########################################################
 # 特定ホストからの入力許可
 ###########################################################
@@ -280,6 +293,7 @@ then
 	# Zabbix関連を許可
 	iptables -A INPUT -p tcp -s $ZABBIX_IP --dport 10050 -j ACCEPT # Zabbix -> SELF
 fi
+
 
 ###########################################################
 # ルール記述部
@@ -305,7 +319,6 @@ iptables -P FORWARD DROP
 iptables -A INPUT  -j LOG --log-prefix "[drop] "
 iptables -A INPUT  -j DROP
  
-
 sleep 30
 
 initialize
