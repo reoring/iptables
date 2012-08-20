@@ -206,7 +206,7 @@ iptables -A INPUT -p icmp --icmp-type echo-request -m limit --limit 1/s --limit-
 ###########################################################
 iptables -N SYN_FLOOD # "SYN_FLOOD" という名前でチェーンを作る
 iptables -A SYN_FLOOD -p tcp --syn \
-	     -m hashlimit \
+         -m hashlimit \
          --hashlimit 200/s \
          --hashlimit-burst 3 \
          --hashlimit-htable-expire 300000 \
@@ -296,7 +296,7 @@ iptables -A INPUT -p icmp -j ACCEPT # ANY -> SELF
 iptables -A INPUT -p tcp -m multiport --dports $HTTP -j ACCEPT # ANY -> SELF
 
 # SSH
-iptables -A INPUT -m tcp -p tcp --dport $SSH -j ACCEPT
+iptables -A INPUT -p tcp --dport $SSH -j ACCEPT
 
 # FTP
 # iptables -A INPUT -p tcp --dport $FTP -j ACCEPT # ANY -> SELF
@@ -342,19 +342,6 @@ then
 	iptables -A INPUT -p tcp -s $ZABBIX_IP --dport 10050 -j ACCEPT # Zabbix -> SELF
 fi
 
-###########################################################
-# それ以外
-# 上記のルールにも当てはまらなかったものはロギングして破棄
-###########################################################
-iptables -A INPUT -j LOG --log-prefix "[drop] "
-iptables -A INPUT -j DROP
- 
 sleep 30
 
 initialize
-
-###########################################################
-# 設定の保存と反映
-###########################################################
-#/etc/init.d/iptables save
-#/etc/init.d/iptables restart
