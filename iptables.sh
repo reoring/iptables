@@ -8,6 +8,17 @@
 # 心配な場合は、送信も受信同様に基本破棄・ホワイトリストで許可するように書き換えると良い。
 ###########################################################
 
+# /**
+#  * iptablesの初期化
+#  * すべてのルールを削除
+#  */
+initialize()
+{
+	iptables -F # テーブル初期化
+	iptables -X # チェーンを削除
+	iptables -Z # パケットカウンタ・バイトカウンタをクリア
+}
+
 
 ###########################################################
 # 用語の統一
@@ -62,19 +73,14 @@ SMTP=25,465,587
 POP3=110,995
 IMAP=143,993
 HTTP=80,443
+HTTPS=443
 IDENT=113
 NTP=123
 MYSQL=3306
 NET_BIOS=135,137,138,139,445
 DHCP=67,68
 
-###########################################################
-# iptablesの初期化
-# すべてのルールを削除
-###########################################################
-iptables -F # テーブル初期化
-iptables -X # チェーンを削除
-iptables -Z # パケットカウンタ・バイトカウンタをクリア
+initialize
 
 # ポリシーの初期化
 # 「ポリシーの決定」でDROPにおきかえる
@@ -132,8 +138,8 @@ iptables -A OUTPUT -p tcp -m state --state ESTABLISHED,RELATED -j ACCEPT
 # 攻撃対策: Stealth Scan
 ###########################################################
 # すべてのTCPセッションがSYNで始まらないものを破棄
-iptables -A INPUT -p tcp ! --syn -m state --state NEW -j LOG --log-prefix "[stealth scan attack] "
-iptables -A INPUT -p tcp ! --syn -m state --state NEW -j DROP
+#iptables -A INPUT -p tcp ! --syn -m state --state NEW -j LOG --log-prefix "[stealth scan attack] "
+#iptables -A INPUT -p tcp ! --syn -m state --state NEW -j DROP
  
 ###########################################################
 # 攻撃対策: Ping of Death
@@ -148,13 +154,13 @@ iptables -A INPUT -p icmp --icmp-type echo-request -m limit --limit 1/s --limit-
 ###########################################################
 iptables -N SYN_FLOOD # "SYN_FLOOD" という名前でチェーンを作る
 iptables -A SYN_FLOOD -p tcp --syn \
-         -m hashlimit \                     # ホストごとに制限するため limit ではなく hashlimit を利用する
-         --hashlimit 200/s \                # 秒間に200接続を上限にする
-         --hashlimit-burst 3 \              # 上記の上限を超えた接続が3回連続であれば制限がかかる
-         --hashlimit-htable-expire 300000 \ # 管理テーブル中のレコードの有効期間（単位：ms
-         --hashlimit-mode srcip \           # 送信元アドレスでリクエスト数を管理する
-         --hashlimit-name t_SYN_FLOOD \     # /proc/net/ipt_hashlimit に保存されるハッシュテーブル名
-         -j RETURN                          # 制限以内であれば、親チェーンに戻る
+	     -m hashlimit \
+         --hashlimit 200/s \
+         --hashlimit-burst 3 \
+         --hashlimit-htable-expire 300000 \
+         --hashlimit-mode srcip \
+         --hashlimit-name t_SYN_FLOOD \
+         -j RETURN
 
 # 制限を超えたSYNパケットを破棄
 iptables -A SYN_FLOOD -j LOG --log-prefix "[SYN flood attack] "
@@ -167,21 +173,23 @@ iptables -A INPUT -p tcp --syn -j SYN_FLOOD
 # 攻撃対策: HTTP DoS/DDoS Attack
 ###########################################################
 iptables -N HTTP_DOS # "HTTP_DOS" という名前でチェーンを作る
-iptables -A HTTP_DOS -p tcp --dport $HTTP \
-         -m hashlimit \                     # ホストごとに制限するため limit ではなく hashlimit を利用する
-         --hashlimit 1/s \                  # 秒間1接続を上限とする
-         --hashlimit-burst 100 \            # 上記の上限を100回連続で超えると制限がかかる
-         --hashlimit-htable-expire 300000 \ # 管理テーブル中のレコードの有効期間（単位：ms
-         --hashlimit-mode srcip \           # 送信元アドレスでリクエスト数を管理する
-         --hashlimit-name t_HTTP_DOS \      # /proc/net/ipt_hashlimit に保存されるハッシュテーブル名
-         -j RETURN                          # 制限以内であれば、親チェーンに戻る
+iptables -A HTTP_DOS -m multiport -p tcp --dports $HTTP \
+         -m hashlimit \
+         --hashlimit 1/s \
+         --hashlimit-burst 100 \
+         --hashlimit-htable-expire 300000 \
+         --hashlimit-mode srcip \
+         --hashlimit-name t_HTTP_DOS \
+         -j RETURN
+
+		 
 
 # 制限を超えた接続を破棄
 iptables -A HTTP_DOS -j LOG --log-prefix "[HTTP DoS attack] "
 iptables -A HTTP_DOS -j DROP
 
 # HTTPへのパケットは "HTTP_DOS" チェーンへジャンプ
-iptables -A INPUT -p tcp --dport $HTTP -j HTTP_DOS
+iptables -A INPUT -p tcp -m multiport --dports $HTTP -j HTTP_DOS
 
 ###########################################################
 # 攻撃対策: IDENT port probe
@@ -230,7 +238,7 @@ iptables -A INPUT -d 255.255.255.255 -j DROP
 iptables -A INPUT -p icmp -j ACCEPT # ANY -> SELF
 
 # HTTP, HTTPS
-iptables -A INPUT -p tcp --dport $HTTP -j ACCEPT # ANY -> SELF
+iptables -A INPUT -p tcp -m multiport --dports $HTTP -j ACCEPT # ANY -> SELF
 
 # FTP
 # iptables -A INPUT -p tcp --dport $FTP -j ACCEPT # ANY -> SELF
@@ -275,12 +283,12 @@ then
 fi
 
 ###########################################################
-# それ以外
-# 上記のルールにも当てはまらなかったものはロギングして破棄
+# ルール記述部
 ###########################################################
-iptables -A INPUT  -j LOG --log-prefix "[drop] "
-iptables -A INPUT  -j DROP
- 
+
+iptables -A INPUT -m tcp -p tcp --dport $SSH -j ACCEPT
+
+
 ###########################################################
 # ポリシーの決定
 # すべてのパケットを破棄(DROP)する。
@@ -290,8 +298,21 @@ iptables -P INPUT   DROP
 iptables -P OUTPUT  ACCEPT
 iptables -P FORWARD DROP
 
+
+###########################################################
+# それ以外
+# 上記のルールにも当てはまらなかったものはロギングして破棄
+###########################################################
+iptables -A INPUT  -j LOG --log-prefix "[drop] "
+iptables -A INPUT  -j DROP
+ 
+
+sleep 30
+
+initialize
+
 ###########################################################
 # 設定の保存と反映
 ###########################################################
-/etc/init.d/iptables save
-/etc/init.d/iptables restart
+#/etc/init.d/iptables save
+#/etc/init.d/iptables restart
