@@ -136,8 +136,8 @@ initialize
 
 # ローカルホスト
 # lo はローカルループバックのことで自分自身のホストを指す
-iptables -A INPUT  -i lo -j ACCEPT # SELF -> SELF
-iptables -A OUTPUT -o lo -j ACCEPT # SELF -> SELF
+iptables -A INPUT -s 127.0.0.1 -d 127.0.0.1 -j ACCEPT
+iptables -A OUTPUT -s 127.0.0.1 -d 127.0.0.1 -j ACCEPT # SELF -> SELF
 
 # ローカルネットワーク
 # $LOCAL_NET が設定されていれば LAN上の他のサーバとのやり取りを許可する
